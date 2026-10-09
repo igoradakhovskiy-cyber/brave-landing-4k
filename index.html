@@ -850,7 +850,7 @@ body.quiz-done .attached{display:block}
 /* =========================================================
    0. Налаштування
    ========================================================= */
-var SUBMIT_URL = "";                 // вебхук CRM (POST JSON). Порожньо = заявка лише в консолі та dataLayer
+var SUBMIT_URL = "";                 // вебхук CRM: сюди вставити URL, заявка піде POST-запитом у JSON (формат — README.md). Порожньо = заявка лише в консолі та dataLayer
 var PIXEL_ID = "1669140901889164";   // піксель BRAVE (той самий, що на landing-A)
 var qs = new URLSearchParams(location.search);
 if (qs.get("review") === "1") document.documentElement.classList.add("review");
@@ -1383,6 +1383,19 @@ function validate(form){
   return true;
 }
 var TIME_LABEL = {morning:"зранку", day:"вдень", evening:"увечері"};
+var SOURCE_LABEL = {quiz_book:"форма під результатом оцінки", header:"кнопка в шапці", hero:"перший екран", free:"блок «Перший крок»", final:"форма внизу сторінки", sticky:"липка кнопка на мобільному"};
+// Один текст для поля «коментар» у CRM: менеджер бачить запит, не розбираючи JSON
+function leadComment(lead){
+  var ch = CH_LABEL[lead.channel] || ("дзвінок" + (lead.time ? ", " + TIME_LABEL[lead.time] : ""));
+  var t = ["Джерело: " + (SOURCE_LABEL[lead.source] || lead.source), "Зв'язок: " + ch];
+  var q = lead.quiz;
+  if (!q){ t.push("Оцінку 4 компетенцій не проходив(-ла)."); return t.join("\n"); }
+  t.push("Рівні: " + Object.keys(q.levels).map(function(k){ return k + " — " + q.levels[k]; }).join("; "));
+  if (q.answers.q10) t.push("Цілі на рік: " + q.answers.q10.answer);
+  t.push("Що обговорити на розборі: " + q.agenda.map(function(a, i){ return (i + 1) + ") " + a.title; }).join("; "));
+  t.push("Резюме: " + q.summary);
+  return t.join("\n");
+}
 var CH_LABEL = {telegram:"Telegram", whatsapp:"WhatsApp", viber:"Viber"};
 $$("[data-form]").forEach(function(form){
   var timeField = form.querySelector("[data-time]");
@@ -1406,8 +1419,9 @@ $$("[data-form]").forEach(function(form){
       quiz: quiz, lead_tag: quiz ? "quiz" : "direct",
       utm_source: qs.get("utm_source"), utm_medium: qs.get("utm_medium"), utm_campaign: qs.get("utm_campaign"), utm_content: qs.get("utm_content"), fbclid: qs.get("fbclid"),
       page: location.pathname, ts: new Date().toISOString(),
-      event_id: "lead_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+      event_id: "lead_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)   // той самий ID іде в Meta Pixel (Lead) і в CRM
     };
+    lead.comment = leadComment(lead);
     var btn = form.querySelector('button[type="submit"]'); btn.disabled = true;
     var send = SUBMIT_URL ? fetch(SUBMIT_URL, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(lead)}) : Promise.resolve();
     send.catch(function(){}).finally(function(){
