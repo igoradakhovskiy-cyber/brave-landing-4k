@@ -274,7 +274,7 @@ html.review .todo{outline:2px dashed #E8833A;outline-offset:2px;background:rgba(
 /* ================= 07 people ================= */
 .founder{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(24px,4vw,56px);align-items:center;background:var(--bg);border-radius:var(--r);padding:clamp(20px,3vw,32px)}
 .founder__ph{border-radius:14px;overflow:hidden;aspect-ratio:4/5;max-width:380px}
-.founder__ph img{width:100%;height:100%;object-fit:cover}
+.founder__ph img{width:100%;height:100%;object-fit:cover;object-position:50% 0}
 .founder .h3{font-size:clamp(22px,2.6vw,30px);margin:0 0 4px}
 .founder__role{color:var(--muted);margin:0 0 16px}
 .founder p{margin:0 0 14px}
@@ -303,7 +303,7 @@ html.review .todo{outline:2px dashed #E8833A;outline-offset:2px;background:rgba(
 @keyframes marquee{to{transform:translateX(-50%)}}
 .wall-cap{font-size:15px;color:var(--muted);margin:14px 0 0}
 @media(max-width:1020px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.tst{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){.founder{grid-template-columns:1fr}.founder__ph{max-width:none;aspect-ratio:4/3}}
+@media(max-width:760px){.founder{grid-template-columns:1fr}.founder__ph{max-width:none;aspect-ratio:1/1}}
 @media(max-width:520px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.tst{grid-template-columns:1fr}}
 
 /* ================= 08 why ================= */
@@ -389,9 +389,10 @@ body.quiz-done .attached{display:block}
 .lightbox .x{background:#fff}
 
 /* sticky mobile cta */
-.sticky{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:45;display:none;transform:translateY(140%);transition:transform .25s}
+/* схована кнопка виїжджає повністю за край екрана, з урахуванням безпечної зони iPhone (інакше з-під низу визирає смужка) */
+.sticky{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:45;display:none;transform:translateY(calc(100% + 40px + env(safe-area-inset-bottom)));opacity:0;visibility:hidden;transition:transform .25s,opacity .2s,visibility 0s linear .25s}
 .sticky .btn{width:100%;box-shadow:0 10px 30px rgba(0,69,255,.35)}
-@media(max-width:760px){.sticky{display:block}.sticky.show{transform:none}}
+@media(max-width:760px){.sticky{display:block}.sticky.show{transform:none;opacity:1;visibility:visible;transition:transform .25s,opacity .2s,visibility 0s}}
 
 
 /* footer */
@@ -1472,23 +1473,25 @@ $("#toBook").addEventListener("click", function(e){
 
 $$(".faq details").forEach(function(d){ d.addEventListener("toggle", function(){ if (d.open){ $$(".faq details").forEach(function(o){ if (o !== d) o.open = false; }); track("faq_open", {cta: d.querySelector("summary").textContent}); } }); });
 
-// липка кнопка на мобільному: ховаємо, коли видно hero-CTA, квіз або форму
-var sticky = $("#sticky"), stickyBtn = $("#stickyBtn"), visible = {};
+// липка кнопка на мобільному: ховаємо лише там, де вона заважає, — біля кнопки першого екрана, поки людина відповідає на квіз, і над формами заявки
+var sticky = $("#sticky"), stickyBtn = $("#stickyBtn");
+var stickyAvoid = {heroCta: $("#heroCta"), quiz: $(".quiz"), quizForm: $("#quizBook .formbox"), finalForm: $("#final .formbox")};
+function inView(el){ if (!el) return false; var r = el.getBoundingClientRect(); return r.height > 0 && r.bottom > 0 && r.top < innerHeight; }
 function updateSticky(){
   if (!sticky) return;
   if (quizResult){ stickyBtn.textContent = "Записатися на безкоштовний розбір"; stickyBtn.removeAttribute("data-quiz-start"); stickyBtn.setAttribute("href", "#final"); }
-  var hide = visible.heroCta || visible.quiz || visible.quizBook || visible.final || visible.free;
+  var hide = inView(stickyAvoid.heroCta) || (!quizResult && inView(stickyAvoid.quiz)) || inView(stickyAvoid.quizForm) || inView(stickyAvoid.finalForm);
   sticky.classList.toggle("show", !hide && scrollY > 300);
 }
 stickyBtn.addEventListener("click", function(e){ if (quizResult){ e.preventDefault(); openModal("sticky"); } });
 if ("IntersectionObserver" in window){
-  var io = new IntersectionObserver(function(entries){ entries.forEach(function(en){ visible[en.target.getAttribute("data-vis")] = en.isIntersecting; }); updateSticky(); }, {threshold: 0.05});
-  [["heroCta", "#heroCta"], ["quiz", ".quiz"], ["quizBook", "#quizBook"], ["final", "#final"], ["free", ".flow"]].forEach(function(p){ var el = $(p[1]); if (el){ el.setAttribute("data-vis", p[0]); io.observe(el); } });
   var rv = new IntersectionObserver(function(entries){ entries.forEach(function(en){ if (en.isIntersecting){ en.target.classList.add("in"); rv.unobserve(en.target); } }); }, {rootMargin: "0px 0px -8% 0px"});
   $$(".rv").forEach(function(el){ rv.observe(el); });
 } else { $$(".rv").forEach(function(el){ el.classList.add("in"); }); }
 var hdr = $("#hdr");
 addEventListener("scroll", function(){ hdr.classList.toggle("scrolled", scrollY > 8); updateSticky(); }, {passive: true});
+addEventListener("resize", updateSticky, {passive: true});
+updateSticky();
 $$("[data-track]").forEach(function(a){ if (!a.hasAttribute("data-quiz-start")) a.addEventListener("click", function(){ track("cta_click", {cta: a.getAttribute("data-track")}); }); });
 
 // Наприкінці, коли все ініціалізовано. ?test=sasha|it|family|dmytro|kyrylo|strong — одразу показати результат профілю (для перевірки)
